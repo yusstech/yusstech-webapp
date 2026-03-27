@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { PLANS, PLAN_ORDER } from "@/lib/plans";
@@ -34,7 +35,7 @@ export default async function HomePage() {
       {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-neutral-100">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <span className="font-semibold text-lg tracking-tight">YusTech</span>
+          <Image src="/logo.png" alt="YussTech" width={140} height={40} className="h-8 w-auto" priority />
           <div className="flex items-center gap-4">
             <Link
               href="/sign-in"
@@ -396,7 +397,7 @@ export default async function HomePage() {
       {/* ── Footer ── */}
       <footer className="border-t border-neutral-100 py-8 px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-400">
-          <span className="font-medium text-neutral-600">YusTech</span>
+          <Image src="/logo.png" alt="YussTech" width={120} height={36} className="h-6 w-auto" />
           <span>Websites · Ecommerce · Mobile · Fintech · Software</span>
           <Link href="/sign-in" className="hover:text-neutral-700 transition-colors">
             Client login →

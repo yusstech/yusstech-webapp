@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
+import Image from "next/image";
 import { UsersIcon, TicketIcon, LayoutDashboardIcon, LinkIcon } from "lucide-react";
 
 const navItems = [
@@ -26,7 +27,7 @@ export default async function AdminLayout({
       <aside className="w-56 shrink-0 border-r border-neutral-200 bg-white flex flex-col">
         <div className="h-16 px-5 flex items-center border-b border-neutral-100">
           <div>
-            <span className="font-semibold tracking-tight block">YusTech</span>
+            <Image src="/logo.png" alt="YussTech" width={120} height={36} className="h-6 w-auto mb-0.5" />
             <span className="text-xs text-neutral-400">Admin</span>
           </div>
         </div>
