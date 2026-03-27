@@ -37,9 +37,23 @@ export async function GET(
 
   const { data: link } = await supabase
     .from("payment_links")
-    .select("plans")
+    .select("status, plans, paystack_reference")
     .eq("slug", slug)
     .single();
+
+  // Idempotency: already processed — just redirect to success
+  if (link?.status === "paid") {
+    return NextResponse.redirect(
+      new URL(`/pay/${slug}/success`, process.env.NEXT_PUBLIC_APP_URL!)
+    );
+  }
+
+  // Prevent replay with a different reference on an already-seen link
+  if (link?.paystack_reference && link.paystack_reference !== reference) {
+    return NextResponse.redirect(
+      new URL(`/pay/${slug}?error=payment_failed`, process.env.NEXT_PUBLIC_APP_URL!)
+    );
+  }
 
   const plan = (link?.plans as PaymentLinkPlan[] | undefined)?.find(
     (p) => p.id === planId
@@ -53,7 +67,8 @@ export async function GET(
       paid_amount: verifyData.data.amount / 100, // kobo → NGN
       paystack_reference: reference,
     })
-    .eq("slug", slug);
+    .eq("slug", slug)
+    .eq("status", "active"); // Only update if still active (extra idempotency guard)
 
   return NextResponse.redirect(
     new URL(`/pay/${slug}/success`, process.env.NEXT_PUBLIC_APP_URL!)

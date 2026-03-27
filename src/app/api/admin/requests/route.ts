@@ -4,9 +4,13 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type { RequestStatus } from "@/types/database";
 
 export async function PATCH(req: Request) {
-  const { sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
+  const { userId, sessionClaims } = await auth();
 
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  }
+
+  const role = (sessionClaims?.metadata as { role?: string })?.role;
   if (role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
