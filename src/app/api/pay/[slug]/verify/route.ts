@@ -8,12 +8,13 @@ export async function GET(
 ) {
   const { slug } = await params;
   const url = new URL(req.url);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || url.origin;
   const reference = url.searchParams.get("reference");
   const planId = url.searchParams.get("planId");
 
   if (!reference || !planId) {
     return NextResponse.redirect(
-      new URL(`/pay/${slug}?error=missing_params`, process.env.NEXT_PUBLIC_APP_URL!)
+      new URL(`/pay/${slug}?error=missing_params`, baseUrl)
     );
   }
 
@@ -29,7 +30,7 @@ export async function GET(
 
   if (!verifyData.status || verifyData.data.status !== "success") {
     return NextResponse.redirect(
-      new URL(`/pay/${slug}?error=payment_failed`, process.env.NEXT_PUBLIC_APP_URL!)
+      new URL(`/pay/${slug}?error=payment_failed`, baseUrl)
     );
   }
 
@@ -44,14 +45,14 @@ export async function GET(
   // Idempotency: already processed — just redirect to success
   if (link?.status === "paid") {
     return NextResponse.redirect(
-      new URL(`/pay/${slug}/success`, process.env.NEXT_PUBLIC_APP_URL!)
+      new URL(`/pay/${slug}`, baseUrl)
     );
   }
 
   // Prevent replay with a different reference on an already-seen link
   if (link?.paystack_reference && link.paystack_reference !== reference) {
     return NextResponse.redirect(
-      new URL(`/pay/${slug}?error=payment_failed`, process.env.NEXT_PUBLIC_APP_URL!)
+      new URL(`/pay/${slug}?error=payment_failed`, baseUrl)
     );
   }
 
@@ -71,6 +72,6 @@ export async function GET(
     .eq("status", "active"); // Only update if still active (extra idempotency guard)
 
   return NextResponse.redirect(
-    new URL(`/pay/${slug}/success`, process.env.NEXT_PUBLIC_APP_URL!)
+    new URL(`/pay/${slug}`, baseUrl)
   );
 }
