@@ -57,7 +57,7 @@ export async function POST(
         planName: plan.name,
         clientName: link.client_name,
       },
-      channels: ["card", "bank_transfer"],
+
     }),
   });
 

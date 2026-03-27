@@ -81,7 +81,6 @@ export async function POST(req: Request) {
         businessName,
         siteUrl,
       },
-      channels: ["card", "bank_transfer"],
     }),
   });
 
