@@ -9,8 +9,9 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "YusTech Client Portal",
-  description: "Manage your YusTech managed services subscription",
+  title: "YusTech — Managed WordPress for Nigerian Businesses",
+  description:
+    "YusTech handles your WordPress hosting, security, updates and support so you can focus on growing your business.",
 };
 
 export default function RootLayout({
