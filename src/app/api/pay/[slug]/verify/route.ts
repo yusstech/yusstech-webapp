@@ -1,0 +1,61 @@
+import { NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/server";
+import type { PaymentLinkPlan } from "@/types/database";
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+  const url = new URL(req.url);
+  const reference = url.searchParams.get("reference");
+  const planId = url.searchParams.get("planId");
+
+  if (!reference || !planId) {
+    return NextResponse.redirect(
+      new URL(`/pay/${slug}?error=missing_params`, process.env.NEXT_PUBLIC_APP_URL!)
+    );
+  }
+
+  // Verify with Paystack
+  const verifyRes = await fetch(
+    `https://api.paystack.co/transaction/verify/${reference}`,
+    {
+      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+    }
+  );
+
+  const verifyData = await verifyRes.json();
+
+  if (!verifyData.status || verifyData.data.status !== "success") {
+    return NextResponse.redirect(
+      new URL(`/pay/${slug}?error=payment_failed`, process.env.NEXT_PUBLIC_APP_URL!)
+    );
+  }
+
+  const supabase = createServiceClient();
+
+  const { data: link } = await supabase
+    .from("payment_links")
+    .select("plans")
+    .eq("slug", slug)
+    .single();
+
+  const plan = (link?.plans as PaymentLinkPlan[] | undefined)?.find(
+    (p) => p.id === planId
+  );
+
+  await supabase
+    .from("payment_links")
+    .update({
+      status: "paid",
+      paid_plan_label: plan?.name ?? planId,
+      paid_amount: verifyData.data.amount / 100, // kobo → NGN
+      paystack_reference: reference,
+    })
+    .eq("slug", slug);
+
+  return NextResponse.redirect(
+    new URL(`/pay/${slug}/success`, process.env.NEXT_PUBLIC_APP_URL!)
+  );
+}
