@@ -33,8 +33,9 @@ export async function POST(
   }
 
   if (link.status !== "active") {
+    const isPending = (link.status as string) === "pending_verification";
     return NextResponse.json(
-      { error: link.status === "pending_verification" ? "Receipt already submitted." : "This link is no longer active." },
+      { error: isPending ? "Receipt already submitted." : "This link is no longer active." },
       { status: 409 }
     );
   }
