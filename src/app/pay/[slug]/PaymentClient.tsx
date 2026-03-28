@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { CheckIcon, StarIcon, AlertTriangleIcon, ArrowUpIcon, UploadIcon } from "lucide-react";
+import { CheckIcon, StarIcon, AlertTriangleIcon, ArrowUpIcon, UploadIcon, CreditCardIcon } from "lucide-react";
 import type { PaymentLinkPlan, PaymentLinkRow } from "@/types/database";
 
 function formatNGN(amount: number) {
@@ -26,6 +26,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
     currentPlan?.id ?? plans[0].id
   );
   const [step, setStep] = useState<"select" | "pay">("select");
+  const [cardUnavailable, setCardUnavailable] = useState(false);
   const [senderName, setSenderName] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -113,6 +114,19 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           <div>
             <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Loyalty Discount</div>
             <div className="font-semibold text-purple-700">{link.loyalty_discount_percent}% applied</div>
+          </div>
+        </div>
+
+        {/* Renewal notice */}
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertTriangleIcon className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-900">Your subscription expires on April 1, 2026</p>
+            <p className="text-sm text-red-700 mt-1">
+              To keep your website running without interruption, please complete your renewal before this date.
+              Once payment is confirmed, your subscription will automatically renew for another year.
+              <strong> If payment is not received by April 1, your website will be taken offline.</strong>
+            </p>
           </div>
         </div>
 
@@ -217,26 +231,61 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           </div>
         )}
 
-        {/* Step 1 CTA — confirm plan selection */}
+        {/* Step 1 CTA — confirm plan + choose payment method */}
         {step === "select" && (
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-            <div>
-              <div className="text-sm text-neutral-500 mb-1">Selected plan</div>
-              <div className="font-semibold text-neutral-900 text-lg">{selectedPlan.name}</div>
-              <div className="text-sm text-neutral-500 mt-0.5">
-                <span className="line-through text-neutral-400">{formatNGN(selectedPlan.original_price)}</span>
-                {" → "}
-                <span className="font-semibold text-neutral-900">{formatNGN(selectedPlan.after_credit)}</span>
-                <span className="text-neutral-400"> / year</span>
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+              <div>
+                <div className="text-sm text-neutral-500 mb-1">Selected plan</div>
+                <div className="font-semibold text-neutral-900 text-lg">{selectedPlan.name}</div>
+                <div className="text-sm text-neutral-500 mt-0.5">
+                  <span className="line-through text-neutral-400">{formatNGN(selectedPlan.original_price)}</span>
+                  {" → "}
+                  <span className="font-semibold text-neutral-900">{formatNGN(selectedPlan.after_credit)}</span>
+                  <span className="text-neutral-400"> / year</span>
+                </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setStep("pay")}
-              className="w-full sm:w-auto bg-blue-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors text-sm"
-            >
-              Proceed to Payment
-            </button>
+
+            <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Choose payment method</div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Card option — unavailable */}
+              <div className="flex-1">
+                <button
+                  type="button"
+                  onClick={() => setCardUnavailable(true)}
+                  className="w-full flex items-center gap-3 border-2 border-neutral-200 rounded-xl p-4 text-left hover:border-neutral-300 transition-colors opacity-70"
+                >
+                  <CreditCardIcon className="w-5 h-5 text-neutral-400 shrink-0" />
+                  <div>
+                    <div className="text-sm font-semibold text-neutral-700">Pay with Card</div>
+                    <div className="text-xs text-neutral-400">Visa, Mastercard, Verve</div>
+                  </div>
+                </button>
+                {cardUnavailable && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                    Card payments are temporarily unavailable. Please use bank transfer below.
+                  </p>
+                )}
+              </div>
+
+              {/* Bank transfer option */}
+              <div className="flex-1">
+                <button
+                  type="button"
+                  onClick={() => setStep("pay")}
+                  className="w-full flex items-center gap-3 border-2 border-blue-600 bg-blue-50 rounded-xl p-4 text-left hover:bg-blue-100 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6h18M3 14h6m-6 4h6m6-4h3m-3 4h3" />
+                  </svg>
+                  <div>
+                    <div className="text-sm font-semibold text-blue-800">Pay by Bank Transfer</div>
+                    <div className="text-xs text-blue-600">Taj Bank · Upload receipt</div>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
