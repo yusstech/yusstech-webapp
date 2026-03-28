@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { CheckIcon, StarIcon, AlertTriangleIcon, ArrowUpIcon } from "lucide-react";
+import { useState, useRef } from "react";
+import { CheckIcon, StarIcon, AlertTriangleIcon, ArrowUpIcon, UploadIcon } from "lucide-react";
 import type { PaymentLinkPlan, PaymentLinkRow } from "@/types/database";
 
 function formatNGN(amount: number) {
@@ -12,6 +12,12 @@ function formatNGN(amount: number) {
   }).format(amount);
 }
 
+const BANK_DETAILS = {
+  bankName: "Taj Bank",
+  accountNumber: "0010808411",
+  accountName: "Yustech Softweb",
+};
+
 export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
   const plans = link.plans as PaymentLinkPlan[];
   const currentPlan = plans.find((p) => p.is_current);
@@ -19,34 +25,51 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
   const [selected, setSelected] = useState<string>(
     currentPlan?.id ?? plans[0].id
   );
+  const [senderName, setSenderName] = useState("");
+  const [receipt, setReceipt] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedPlan = plans.find((p) => p.id === selected)!;
 
-  // Determine if the selected plan is a downgrade
   const currentIdx = currentPlan ? plans.indexOf(currentPlan) : -1;
   const selectedIdx = plans.indexOf(selectedPlan);
   const isDowngrade = currentIdx !== -1 && selectedIdx < currentIdx;
-
-  // Plans at or above current level to recommend
   const recommendedPlans = plans.filter((_, i) => i >= currentIdx);
 
-  async function handlePay() {
+  async function handleSubmit() {
+    if (!senderName.trim()) {
+      setError("Please enter the name used for the bank transfer.");
+      return;
+    }
+    if (!receipt) {
+      setError("Please upload your payment receipt.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      const res = await fetch(`/api/pay/${link.slug}/init`, {
+      const formData = new FormData();
+      formData.append("planId", selected);
+      formData.append("senderName", senderName.trim());
+      formData.append("receipt", receipt);
+
+      const res = await fetch(`/api/pay/${link.slug}/transfer`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: selected }),
+        body: formData,
       });
+
       const data = await res.json();
+
       if (!res.ok) {
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
-      window.location.href = data.authorizationUrl;
+
+      window.location.reload();
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -63,7 +86,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
             <span className="font-semibold tracking-tight text-neutral-900">YusTech</span>
             <span className="text-neutral-400 text-sm ml-2">/ Subscription Renewal</span>
           </div>
-          <span className="text-xs text-neutral-400">Secure payment via Paystack</span>
+          <span className="text-xs text-neutral-400">Secure payment via bank transfer</span>
         </div>
       </header>
 
@@ -97,7 +120,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           Prices already reflect your {link.loyalty_discount_percent}% loyalty discount and {formatNGN(link.available_credit)} credit.
         </p>
 
-        {/* Plan cards — divs to avoid browser quirks with <button> containing block elements */}
+        {/* Plan cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {plans.map((plan: PaymentLinkPlan) => {
             const isSelected = selected === plan.id;
@@ -130,7 +153,6 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
                   />
                 </div>
 
-                {/* Pricing */}
                 <div className="mb-4">
                   <div className="text-xs text-neutral-400 line-through">{formatNGN(plan.original_price)}</div>
                   <div className="text-xs text-neutral-500">
@@ -142,7 +164,6 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
                   <div className="text-xs text-neutral-400">/ year</div>
                 </div>
 
-                {/* Features */}
                 <ul className="space-y-1.5">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-1.5 text-xs text-neutral-600">
@@ -195,30 +216,88 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           </div>
         )}
 
-        {/* Pay CTA */}
-        <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="text-sm text-neutral-500 mb-1">You&apos;re renewing</div>
-            <div className="font-semibold text-neutral-900 text-lg">{selectedPlan.name}</div>
-            <div className="text-sm text-neutral-500 mt-0.5">
-              <span className="line-through text-neutral-400">{formatNGN(selectedPlan.original_price)}</span>
-              {" → "}
-              <span className="font-semibold text-neutral-900">{formatNGN(selectedPlan.after_credit)}</span>
-              <span className="text-neutral-400"> / year</span>
+        {/* Bank transfer + receipt upload */}
+        <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden mb-6">
+          {/* Bank details */}
+          <div className="p-6 border-b border-neutral-100">
+            <h2 className="text-sm font-semibold text-neutral-900 mb-4">Transfer to this account</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-neutral-50 rounded-lg p-4">
+                <div className="text-xs text-neutral-500 mb-1">Bank</div>
+                <div className="font-semibold text-neutral-900">{BANK_DETAILS.bankName}</div>
+              </div>
+              <div className="bg-neutral-50 rounded-lg p-4">
+                <div className="text-xs text-neutral-500 mb-1">Account Number</div>
+                <div className="font-semibold text-neutral-900 text-lg tracking-widest">{BANK_DETAILS.accountNumber}</div>
+              </div>
+              <div className="bg-neutral-50 rounded-lg p-4">
+                <div className="text-xs text-neutral-500 mb-1">Account Name</div>
+                <div className="font-semibold text-neutral-900">{BANK_DETAILS.accountName}</div>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+              <span className="text-xs text-blue-700">Transfer exactly</span>
+              <span className="font-bold text-blue-800">{formatNGN(selectedPlan.after_credit)}</span>
+              <span className="text-xs text-blue-700">for the <strong>{selectedPlan.name}</strong> plan</span>
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
-            {error && <p className="text-xs text-red-600 text-right">{error}</p>}
-            <button
-              type="button"
-              onClick={handlePay}
-              disabled={loading}
-              className="w-full sm:w-auto bg-blue-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
-            >
-              {loading ? "Redirecting…" : `Pay ${formatNGN(selectedPlan.after_credit)}`}
-            </button>
-            <p className="text-xs text-neutral-400">Secured by Paystack · Annual plan</p>
+          {/* Receipt upload form */}
+          <div className="p-6">
+            <h2 className="text-sm font-semibold text-neutral-900 mb-4">Upload your receipt</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-neutral-600 mb-1.5">
+                  Name used for the transfer
+                </label>
+                <input
+                  type="text"
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  placeholder="e.g. Beauty Finds NG"
+                  className="w-full sm:w-80 px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-neutral-600 mb-1.5">
+                  Payment receipt (screenshot or PDF)
+                </label>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="cursor-pointer border-2 border-dashed border-neutral-300 rounded-lg px-6 py-8 text-center hover:border-blue-400 transition-colors"
+                >
+                  <UploadIcon className="w-6 h-6 text-neutral-400 mx-auto mb-2" />
+                  {receipt ? (
+                    <p className="text-sm font-medium text-blue-700">{receipt.name}</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-neutral-600">Click to upload receipt</p>
+                      <p className="text-xs text-neutral-400 mt-1">PNG, JPG, PDF up to 10MB</p>
+                    </>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
+                />
+              </div>
+
+              {error && <p className="text-xs text-red-600">{error}</p>}
+
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading}
+                className="w-full sm:w-auto bg-blue-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
+              >
+                {loading ? "Submitting…" : `Submit Receipt — ${formatNGN(selectedPlan.after_credit)}`}
+              </button>
+              <p className="text-xs text-neutral-400">We&apos;ll confirm your payment within 24 hours</p>
+            </div>
           </div>
         </div>
       </div>

@@ -36,6 +36,25 @@ export default async function PayPage({ params }: Props) {
     );
   }
 
+  if (link.status === "pending_verification") {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
+        <div className="bg-white border border-neutral-200 rounded-xl p-10 max-w-md text-center">
+          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-semibold text-neutral-900 mb-2">Receipt received</h1>
+          <p className="text-sm text-neutral-500">
+            We&apos;ve received your payment receipt and will confirm your renewal within 24 hours.
+            We&apos;ll reach out to <strong>{link.client_email}</strong> once verified.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (link.status === "expired") {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
