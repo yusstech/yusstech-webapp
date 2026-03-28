@@ -25,6 +25,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
   const [selected, setSelected] = useState<string>(
     currentPlan?.id ?? plans[0].id
   );
+  const [step, setStep] = useState<"select" | "pay">("select");
   const [senderName, setSenderName] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -216,11 +217,44 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           </div>
         )}
 
-        {/* Bank transfer + receipt upload */}
+        {/* Step 1 CTA — confirm plan selection */}
+        {step === "select" && (
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="text-sm text-neutral-500 mb-1">Selected plan</div>
+              <div className="font-semibold text-neutral-900 text-lg">{selectedPlan.name}</div>
+              <div className="text-sm text-neutral-500 mt-0.5">
+                <span className="line-through text-neutral-400">{formatNGN(selectedPlan.original_price)}</span>
+                {" → "}
+                <span className="font-semibold text-neutral-900">{formatNGN(selectedPlan.after_credit)}</span>
+                <span className="text-neutral-400"> / year</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStep("pay")}
+              className="w-full sm:w-auto bg-blue-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors text-sm"
+            >
+              Proceed to Payment
+            </button>
+          </div>
+        )}
+
+        {/* Step 2 — bank transfer + receipt upload */}
+        {step === "pay" && (
         <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden mb-6">
           {/* Bank details */}
           <div className="p-6 border-b border-neutral-100">
-            <h2 className="text-sm font-semibold text-neutral-900 mb-4">Transfer to this account</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-neutral-900">Transfer to this account</h2>
+              <button
+                type="button"
+                onClick={() => setStep("select")}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                ← Change plan
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-neutral-50 rounded-lg p-4">
                 <div className="text-xs text-neutral-500 mb-1">Bank</div>
@@ -300,6 +334,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
