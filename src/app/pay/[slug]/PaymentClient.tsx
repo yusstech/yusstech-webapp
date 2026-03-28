@@ -5,7 +5,6 @@ import {
   CheckIcon,
   StarIcon,
   AlertTriangleIcon,
-  ArrowUpIcon,
   UploadIcon,
   CreditCardIcon,
   XIcon,
@@ -30,13 +29,18 @@ const BANK_DETAILS = {
 
 const EXPIRY_DATE = new Date("2026-04-01");
 
-type ModalState = "method" | "pay" | "success";
+type ModalState = "method" | "pay";
 
 export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
   const plans = link.plans as PaymentLinkPlan[];
   const currentPlan = plans.find((p) => p.is_current);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const currentIdx = currentPlan ? plans.findIndex((p) => p.is_current) : 0;
+  const visiblePlans = plans.filter((_, i) => i >= currentIdx);
+
+  const [selectedId, setSelectedId] = useState<string>(
+    currentPlan?.id ?? plans[0].id
+  );
   const [modal, setModal] = useState<ModalState | null>(null);
   const [senderName, setSenderName] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
@@ -44,11 +48,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedPlan = plans.find((p) => p.id === selectedId);
-  const currentIdx = currentPlan ? plans.findIndex((p) => p.is_current) : -1;
-  const selectedIdx = plans.findIndex((p) => p.id === selectedId);
-  const isDowngrade = currentIdx !== -1 && selectedIdx !== -1 && selectedIdx < currentIdx;
-  const recommendedPlans = plans.filter((_, i) => i >= currentIdx);
+  const selectedPlan = plans.find((p) => p.id === selectedId) ?? currentPlan!;
 
   const daysLeft = Math.ceil((EXPIRY_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   const urgent = daysLeft <= 7;
@@ -93,7 +93,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
-      setModal("success");
+      window.location.href = process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || "/sign-in";
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -161,15 +161,15 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           </div>
         </div>
 
-        <h1 className="text-xl font-semibold text-neutral-900 mb-2">Select a plan to renew</h1>
+        <h1 className="text-xl font-semibold text-neutral-900 mb-2">Your renewal plan</h1>
         <p className="text-sm text-neutral-500 mb-6">
-          Prices reflect your {link.loyalty_discount_percent}% loyalty discount and {formatNGN(link.available_credit)} credit.
-          Click a plan to pay.
+          Price reflects your {link.loyalty_discount_percent}% loyalty discount and {formatNGN(link.available_credit)} credit.
+          Click to proceed with payment.
         </p>
 
-        {/* Plan cards */}
+        {/* Plan cards — current plan + upgrades only */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {plans.map((plan: PaymentLinkPlan) => (
+          {visiblePlans.map((plan: PaymentLinkPlan) => (
             <div
               key={plan.id}
               role="button"
@@ -188,7 +188,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
                   )}
                 </div>
                 <div className="w-7 h-7 rounded-full bg-neutral-100 group-hover:bg-blue-600 flex items-center justify-center transition-colors shrink-0">
-                  <ArrowUpIcon className="w-3.5 h-3.5 text-neutral-400 group-hover:text-white rotate-45 transition-colors" />
+                  <CheckIcon className="w-3.5 h-3.5 text-neutral-400 group-hover:text-white transition-colors" />
                 </div>
               </div>
 
@@ -240,31 +240,6 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
             {/* STATE 1: Method */}
             {modal === "method" && (
               <div className="p-6">
-                {/* Downgrade warning */}
-                {isDowngrade && currentPlan && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-amber-900 mb-1">Downgrade from {currentPlan.name}</p>
-                        <p className="text-xs text-amber-800 mb-2">This may reduce your site&apos;s performance and support. Recommended:</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {recommendedPlans.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => setSelectedId(p.id)}
-                              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
-                            >
-                              {p.name} — {formatNGN(p.after_credit)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <p className="text-sm font-medium text-neutral-700 mb-4">Choose payment method</p>
                 <div className="space-y-3">
                   {/* Card — unavailable */}
@@ -405,28 +380,6 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
               </div>
             )}
 
-            {/* STATE 3: Success */}
-            {modal === "success" && (
-              <div className="p-8 text-center">
-                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckIcon className="w-7 h-7 text-green-600" />
-                </div>
-                <h2 className="text-lg font-semibold text-neutral-900 mb-2">Receipt Submitted</h2>
-                <p className="text-sm text-neutral-500 mb-1">
-                  We&apos;ll verify your payment and activate your <strong>{selectedPlan.name}</strong> renewal within 24 hours.
-                </p>
-                <p className="text-sm text-neutral-500 mb-6">
-                  You&apos;ll hear from us at <strong>{link.client_email}</strong>.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="w-full bg-neutral-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-neutral-800 transition-colors text-sm"
-                >
-                  Done
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
