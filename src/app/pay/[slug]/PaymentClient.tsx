@@ -10,7 +10,7 @@ import {
   CreditCardIcon,
   XIcon,
   BuildingIcon,
-  ClockIcon,
+  RefreshCwIcon,
 } from "lucide-react";
 import type { PaymentLinkPlan, PaymentLinkRow } from "@/types/database";
 
@@ -30,7 +30,7 @@ const BANK_DETAILS = {
 
 const EXPIRY_DATE = new Date("2026-04-01");
 
-type ModalState = "method" | "transfer" | "receipt";
+type ModalState = "method" | "pay" | "success";
 
 export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
   const plans = link.plans as PaymentLinkPlan[];
@@ -38,7 +38,6 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
-  const [cardUnavailable, setCardUnavailable] = useState(false);
   const [senderName, setSenderName] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,26 +50,25 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
   const isDowngrade = currentIdx !== -1 && selectedIdx !== -1 && selectedIdx < currentIdx;
   const recommendedPlans = plans.filter((_, i) => i >= currentIdx);
 
-  const msLeft = EXPIRY_DATE.getTime() - Date.now();
-  const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+  const daysLeft = Math.ceil((EXPIRY_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   const urgent = daysLeft <= 7;
 
   function openModal(planId: string) {
     setSelectedId(planId);
     setModal("method");
-    setCardUnavailable(false);
-    setError(null);
-  }
-
-  function closeModal() {
-    setModal(null);
-    setCardUnavailable(false);
     setError(null);
     setSenderName("");
     setReceipt(null);
   }
 
-  async function handleSubmitReceipt() {
+  function closeModal() {
+    setModal(null);
+    setError(null);
+    setSenderName("");
+    setReceipt(null);
+  }
+
+  async function handleSubmit() {
     if (!senderName.trim()) {
       setError("Please enter the name used for the transfer.");
       return;
@@ -95,7 +93,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
-      window.location.reload();
+      setModal("success");
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -111,10 +109,6 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           <div>
             <span className="font-semibold tracking-tight text-neutral-900">YusTech</span>
             <span className="text-neutral-400 text-sm ml-2">/ Subscription Renewal</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full">
-            <ClockIcon className="w-3.5 h-3.5" />
-            {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left` : "Expires today"}
           </div>
         </div>
       </header>
@@ -144,27 +138,24 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
           </div>
         </div>
 
-        {/* Expiry timeline banner */}
+        {/* Expiry banner */}
         <div className={`rounded-xl border p-4 mb-8 ${urgent ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
           <div className="flex items-start gap-3">
             <AlertTriangleIcon className={`w-5 h-5 shrink-0 mt-0.5 ${urgent ? "text-red-500" : "text-amber-500"}`} />
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <p className={`text-sm font-semibold ${urgent ? "text-red-900" : "text-amber-900"}`}>
-                  Your subscription expires on <strong>April 1, 2026</strong> — {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining
-                </p>
-              </div>
-              {/* Timeline bar */}
-              <div className="w-full bg-white/60 rounded-full h-2 mb-3 overflow-hidden">
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold mb-2 ${urgent ? "text-red-900" : "text-amber-900"}`}>
+                Subscription expires <strong>April 1, 2026</strong> — {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining
+              </p>
+              <div className="w-full bg-white/60 rounded-full h-1.5 mb-3 overflow-hidden">
                 <div
-                  className={`h-2 rounded-full transition-all ${urgent ? "bg-red-400" : "bg-amber-400"}`}
+                  className={`h-1.5 rounded-full ${urgent ? "bg-red-400" : "bg-amber-400"}`}
                   style={{ width: `${Math.max(4, Math.min(100, (daysLeft / 30) * 100))}%` }}
                 />
               </div>
               <p className={`text-sm ${urgent ? "text-red-700" : "text-amber-800"}`}>
-                Renew now to keep your website live and uninterrupted. Once payment is confirmed,
+                Renew before April 1 to keep your website running without interruption. Once payment is confirmed,
                 your subscription <strong>automatically renews for another year</strong>.
-                If payment is not received by April 1, <strong>your website will be taken offline</strong> until it is settled.
+                If not received by then, <strong>your website will be taken offline</strong>.
               </p>
             </div>
           </div>
@@ -172,10 +163,11 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
 
         <h1 className="text-xl font-semibold text-neutral-900 mb-2">Select a plan to renew</h1>
         <p className="text-sm text-neutral-500 mb-6">
-          Prices reflect your {link.loyalty_discount_percent}% loyalty discount and {formatNGN(link.available_credit)} credit. Click a plan to proceed.
+          Prices reflect your {link.loyalty_discount_percent}% loyalty discount and {formatNGN(link.available_credit)} credit.
+          Click a plan to pay.
         </p>
 
-        {/* Plan cards — click to open payment modal */}
+        {/* Plan cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {plans.map((plan: PaymentLinkPlan) => (
             <div
@@ -209,7 +201,7 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
                 <div className="text-xs text-neutral-400">/ year</div>
               </div>
 
-              <ul className="space-y-1.5 mb-4">
+              <ul className="space-y-1.5">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-1.5 text-xs text-neutral-600">
                     <CheckIcon className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
@@ -217,11 +209,6 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
                   </li>
                 ))}
               </ul>
-
-              <div className="flex items-center gap-1.5 text-xs text-red-500 font-medium mt-auto pt-2 border-t border-neutral-100">
-                <ClockIcon className="w-3 h-3" />
-                Expires Apr 1, 2026
-              </div>
             </div>
           ))}
         </div>
@@ -229,10 +216,14 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
 
       {/* Modal */}
       {modal && selectedPlan && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+          onClick={(e) => e.target === e.currentTarget && closeModal()}
+        >
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+
             {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
+            <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-neutral-100 z-10">
               <div>
                 <div className="font-semibold text-neutral-900">{selectedPlan.name}</div>
                 <div className="text-sm text-neutral-500">{formatNGN(selectedPlan.after_credit)} / year</div>
@@ -240,66 +231,62 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
               <button
                 type="button"
                 onClick={closeModal}
-                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors shrink-0"
               >
                 <XIcon className="w-4 h-4 text-neutral-600" />
               </button>
             </div>
 
-            {/* Downgrade warning inside modal */}
-            {isDowngrade && currentPlan && modal === "method" && (
-              <div className="mx-6 mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-amber-900 mb-1">Downgrade from {currentPlan.name}</p>
-                    <p className="text-xs text-amber-800 mb-2">This may affect your site performance and support. We recommend:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {recommendedPlans.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setSelectedId(p.id)}
-                          className="text-xs font-medium px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
-                        >
-                          {p.name} — {formatNGN(p.after_credit)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* STATE 1: Choose payment method */}
+            {/* STATE 1: Method */}
             {modal === "method" && (
               <div className="p-6">
-                <p className="text-sm font-medium text-neutral-700 mb-4">How would you like to pay?</p>
+                {/* Downgrade warning */}
+                {isDowngrade && currentPlan && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-900 mb-1">Downgrade from {currentPlan.name}</p>
+                        <p className="text-xs text-amber-800 mb-2">This may reduce your site&apos;s performance and support. Recommended:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {recommendedPlans.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setSelectedId(p.id)}
+                              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
+                            >
+                              {p.name} — {formatNGN(p.after_credit)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-sm font-medium text-neutral-700 mb-4">Choose payment method</p>
                 <div className="space-y-3">
                   {/* Card — unavailable */}
-                  <button
-                    type="button"
-                    onClick={() => setCardUnavailable(true)}
-                    className="w-full flex items-center gap-4 border-2 border-neutral-200 rounded-xl p-4 text-left hover:border-neutral-300 transition-colors opacity-60"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
-                      <CreditCardIcon className="w-5 h-5 text-neutral-500" />
+                  <div className="border-2 border-neutral-200 rounded-xl p-4 opacity-60 cursor-not-allowed">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
+                        <CreditCardIcon className="w-5 h-5 text-neutral-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-neutral-700">Pay with Card</span>
+                          <span className="text-xs font-medium bg-neutral-200 text-neutral-500 px-2 py-0.5 rounded-full">Unavailable</span>
+                        </div>
+                        <div className="text-xs text-neutral-400">Visa · Mastercard · Verve</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-sm font-semibold text-neutral-700">Pay with Card</div>
-                      <div className="text-xs text-neutral-400">Visa · Mastercard · Verve</div>
-                    </div>
-                  </button>
-                  {cardUnavailable && (
-                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                      Card payments are temporarily unavailable. Please use bank transfer below.
-                    </div>
-                  )}
+                  </div>
 
                   {/* Bank transfer */}
                   <button
                     type="button"
-                    onClick={() => setModal("transfer")}
+                    onClick={() => { setModal("pay"); setError(null); }}
                     className="w-full flex items-center gap-4 border-2 border-blue-600 bg-blue-50 rounded-xl p-4 text-left hover:bg-blue-100 transition-colors"
                   >
                     <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
@@ -307,129 +294,137 @@ export default function PaymentClient({ link }: { link: PaymentLinkRow }) {
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-blue-800">Pay by Bank Transfer</div>
-                      <div className="text-xs text-blue-600">Taj Bank · Instant confirmation</div>
+                      <div className="text-xs text-blue-600">Taj Bank · Upload receipt after transfer</div>
                     </div>
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STATE 2: Bank transfer details */}
-            {modal === "transfer" && (
-              <div className="p-6">
-                <p className="text-sm text-neutral-500 mb-4">
-                  Transfer the exact amount below to this account, then click <strong>I&apos;ve Made the Payment</strong>.
-                </p>
-                <div className="space-y-2 mb-4">
-                  {[
-                    { label: "Bank", value: BANK_DETAILS.bankName },
-                    { label: "Account Number", value: BANK_DETAILS.accountNumber },
-                    { label: "Account Name", value: BANK_DETAILS.accountName },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between bg-neutral-50 rounded-lg px-4 py-3">
-                      <span className="text-xs text-neutral-500">{label}</span>
-                      <span className="text-sm font-semibold text-neutral-900 tracking-wide">{value}</span>
+            {/* STATE 2: Pay — bank details + upload combined */}
+            {modal === "pay" && (
+              <div className="p-6 space-y-5">
+                {/* Bank details */}
+                <div>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Transfer to</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: "Bank", value: BANK_DETAILS.bankName },
+                      { label: "Account Number", value: BANK_DETAILS.accountNumber },
+                      { label: "Account Name", value: BANK_DETAILS.accountName },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex items-center justify-between bg-neutral-50 rounded-lg px-4 py-3">
+                        <span className="text-xs text-neutral-500">{label}</span>
+                        <span className="text-sm font-semibold text-neutral-900 tracking-wide">{value}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                      <span className="text-xs text-blue-700 font-medium">Amount</span>
+                      <span className="text-base font-bold text-blue-800">{formatNGN(selectedPlan.after_credit)}</span>
                     </div>
-                  ))}
-                  <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
-                    <span className="text-xs text-blue-700 font-medium">Amount to Transfer</span>
-                    <span className="text-base font-bold text-blue-800">{formatNGN(selectedPlan.after_credit)}</span>
                   </div>
                 </div>
 
                 {/* Auto-renewal note */}
-                <div className="bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 mb-5 text-xs text-neutral-600 space-y-1">
-                  <p>✅ <strong>Once payment is confirmed, your subscription automatically renews for 1 year.</strong></p>
-                  <p>⚠️ If payment is not received by <strong>April 1, 2026</strong>, your website will be taken offline.</p>
+                <div className="bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <RefreshCwIcon className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-neutral-700"><strong>Auto-renews for 1 year</strong> once payment is confirmed.</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <AlertTriangleIcon className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-neutral-700">Website goes offline if not paid by <strong>April 1, 2026</strong>.</p>
+                  </div>
                 </div>
 
-                <div className="flex gap-3">
+                {/* Receipt form */}
+                <div>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Upload your receipt</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1.5">
+                        Name used for the transfer
+                      </label>
+                      <input
+                        type="text"
+                        value={senderName}
+                        onChange={(e) => setSenderName(e.target.value)}
+                        placeholder="e.g. Beauty Finds NG"
+                        className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1.5">
+                        Receipt (screenshot or PDF)
+                      </label>
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="cursor-pointer border-2 border-dashed border-neutral-300 rounded-xl px-6 py-6 text-center hover:border-blue-400 transition-colors"
+                      >
+                        <UploadIcon className="w-5 h-5 text-neutral-400 mx-auto mb-2" />
+                        {receipt ? (
+                          <p className="text-sm font-medium text-blue-700">{receipt.name}</p>
+                        ) : (
+                          <>
+                            <p className="text-sm text-neutral-600">Click to upload</p>
+                            <p className="text-xs text-neutral-400 mt-0.5">PNG, JPG or PDF · max 10MB</p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {error && <p className="text-xs text-red-600">{error}</p>}
+
+                <div className="flex gap-3 pt-1">
                   <button
                     type="button"
-                    onClick={() => setModal("method")}
+                    onClick={() => { setModal("method"); setError(null); }}
                     className="flex-1 border border-neutral-300 text-neutral-700 font-medium px-4 py-3 rounded-xl hover:bg-neutral-50 transition-colors text-sm"
                   >
                     Back
                   </button>
                   <button
                     type="button"
-                    onClick={() => setModal("receipt")}
-                    className="flex-1 bg-blue-600 text-white font-semibold px-4 py-3 rounded-xl hover:bg-blue-700 transition-colors text-sm"
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="flex-1 bg-blue-600 text-white font-semibold px-4 py-3 rounded-xl hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
                   >
-                    I&apos;ve Made the Payment
+                    {loading ? "Submitting…" : "Submit Receipt"}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STATE 3: Receipt upload */}
-            {modal === "receipt" && (
-              <div className="p-6">
-                <p className="text-sm text-neutral-500 mb-5">
-                  Upload your payment receipt so we can verify and activate your renewal promptly.
-                </p>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1.5">
-                      Name used for the transfer
-                    </label>
-                    <input
-                      type="text"
-                      value={senderName}
-                      onChange={(e) => setSenderName(e.target.value)}
-                      placeholder="e.g. Beauty Finds NG"
-                      className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1.5">
-                      Payment receipt (screenshot or PDF)
-                    </label>
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="cursor-pointer border-2 border-dashed border-neutral-300 rounded-xl px-6 py-8 text-center hover:border-blue-400 transition-colors"
-                    >
-                      <UploadIcon className="w-6 h-6 text-neutral-400 mx-auto mb-2" />
-                      {receipt ? (
-                        <p className="text-sm font-medium text-blue-700">{receipt.name}</p>
-                      ) : (
-                        <>
-                          <p className="text-sm text-neutral-600">Click to upload receipt</p>
-                          <p className="text-xs text-neutral-400 mt-1">PNG, JPG, PDF up to 10MB</p>
-                        </>
-                      )}
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,.pdf"
-                      className="hidden"
-                      onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
-                    />
-                  </div>
-
-                  {error && <p className="text-xs text-red-600">{error}</p>}
-
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setModal("transfer")}
-                      className="flex-1 border border-neutral-300 text-neutral-700 font-medium px-4 py-3 rounded-xl hover:bg-neutral-50 transition-colors text-sm"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSubmitReceipt}
-                      disabled={loading}
-                      className="flex-1 bg-blue-600 text-white font-semibold px-4 py-3 rounded-xl hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm"
-                    >
-                      {loading ? "Submitting…" : "Submit Receipt"}
-                    </button>
-                  </div>
-                  <p className="text-xs text-neutral-400 text-center">We&apos;ll confirm your renewal within 24 hours</p>
+            {/* STATE 3: Success */}
+            {modal === "success" && (
+              <div className="p-8 text-center">
+                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckIcon className="w-7 h-7 text-green-600" />
                 </div>
+                <h2 className="text-lg font-semibold text-neutral-900 mb-2">Receipt Submitted</h2>
+                <p className="text-sm text-neutral-500 mb-1">
+                  We&apos;ll verify your payment and activate your <strong>{selectedPlan.name}</strong> renewal within 24 hours.
+                </p>
+                <p className="text-sm text-neutral-500 mb-6">
+                  You&apos;ll hear from us at <strong>{link.client_email}</strong>.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="w-full bg-neutral-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-neutral-800 transition-colors text-sm"
+                >
+                  Done
+                </button>
               </div>
             )}
           </div>
