@@ -160,7 +160,7 @@ export interface Database {
           available_credit: number;
           loyalty_discount_percent: number;
           plans: PaymentLinkPlan[];
-          status: "active" | "paid" | "expired";
+          status: "active" | "paid" | "expired" | "pending_verification";
           paid_plan_label: string | null;
           paid_amount: number | null;
           paystack_reference: string | null;
