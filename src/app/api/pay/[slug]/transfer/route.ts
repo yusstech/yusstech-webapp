@@ -51,7 +51,7 @@ export async function POST(
   const adminEmail = process.env.ADMIN_EMAIL!;
   const fromEmail = process.env.RESEND_FROM_EMAIL!;
 
-  await resend.emails.send({
+  const emailResult = await resend.emails.send({
     from: fromEmail,
     to: adminEmail,
     subject: `Payment Receipt — ${link.client_name} (${plan.name})`,
@@ -73,6 +73,11 @@ export async function POST(
       },
     ],
   });
+
+  if (emailResult.error) {
+    console.error("Resend error:", emailResult.error);
+    return NextResponse.json({ error: "Failed to send notification email. Please try again." }, { status: 500 });
+  }
 
   await supabase
     .from("payment_links")
